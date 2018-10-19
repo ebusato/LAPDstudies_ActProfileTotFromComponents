@@ -5,7 +5,8 @@ public:
   double m_ts; // in sec
   double m_I; // nA of proton beam
 
-  double getProtonsPerSecond();
+  double getProtonsPerSecondAverage();
+  double getProtonsPerSecondInSpill();
   double getSpillFraction();
 };
 
@@ -14,16 +15,21 @@ double Beam::getSpillFraction()
   return m_ts/(m_ts+m_tp);
 }
 
-double Beam::getProtonsPerSecond()
+double Beam::getProtonsPerSecondAverage()
 {
   return m_I*1e-9/1.6e-19;
+}
+
+double Beam::getProtonsPerSecondInSpill()
+{
+  return m_I*1e-9/1.6e-19*(m_tp+m_ts)/m_ts;
 }
 
 class Isotope {
 public:
   double m_lambda; // sec^{-1}
   double m_rate; // # beta+ emitters per proton
-  double m_rateprime; // # beta+ emitters per sec
+  double m_rateprime; // # beta+ emitters per sec in spill
   Beam* p_beamPtr;
   
   Isotope(double lambda, double r, Beam* b);
@@ -36,11 +42,9 @@ Isotope::Isotope(double l, double r, Beam* b)
 {
   m_lambda = l;
   m_rate = r;
-  m_rateprime = m_rate*b->getProtonsPerSecond();
+  m_rateprime = m_rate*b->getProtonsPerSecondInSpill();
+  cout << "rates: " << m_rate << "  " << m_rateprime << endl;
   p_beamPtr = b; 
-  cout << "rates: " << m_rate << "  " << b->getProtonsPerSecond() << endl;
-
-  //  constant = rateprime*TMath::Exp(-1*this->lambda*b->tp)*(1-TMath::Exp(-1*this->lambda*b->ts))/(1-TMath::Exp(-1*this->lambda*(b->ts+b->tp)));
 }
 
 // NO = initial number (before start of activation phase)
@@ -60,7 +64,7 @@ double Isotope::NumberOfDecaysAfterDeactivation(double N0, double time)
 // time in sec
 double Isotope::TotNumber(double N0, double time)
 {
-  return N0 + p_beamPtr->getProtonsPerSecond()*m_rate*time;
+  return N0 + p_beamPtr->getProtonsPerSecondAverage()*m_rate*time;
 }
 
 void setGraphStyle(TGraph* g, int color)
@@ -121,7 +125,7 @@ void ActProfileTotFromComponents()
   }
   
   // compute numbers for given times
-  for(double i=1; i<times.size(); i++) {
+  for(double i=0; i<times.size(); i++) {
     double t = times[i];
 
     if(i < i_firstOfDeactivation) { // activation
