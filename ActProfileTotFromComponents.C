@@ -1,9 +1,9 @@
 
 class Beam {
 public:
-  double tp; // in sec
-  double ts; // in sec
-  double I; // nA of proton beam
+  double m_tp; // in sec
+  double m_ts; // in sec
+  double m_I; // nA of proton beam
 
   double getProtonsPerSecond();
   double getSpillFraction();
@@ -11,12 +11,12 @@ public:
 
 double Beam::getSpillFraction()
 {
-  return ts/(ts+tp);
+  return m_ts/(m_ts+m_tp);
 }
 
 double Beam::getProtonsPerSecond()
 {
-  return I*1e-9/1.6e-19;
+  return m_I*1e-9/1.6e-19;
 }
 
 class Isotope {
@@ -80,9 +80,9 @@ void ActProfileTotFromComponents()
   int n = 20000; // number of points
   
   Beam b;
-  b.tp = 36e-9;
-  b.ts = 4e-9;
-  b.I = 8;
+  b.m_tp = 36e-9;
+  b.m_ts = 4e-9;
+  b.m_I = 8;
   
   Isotope N12(TMath::Log(2)/(11e-3), 5.05425e-4, &b);
   Isotope C11(TMath::Log(2)/(20.36*60), 5.0419e-3, &b);
