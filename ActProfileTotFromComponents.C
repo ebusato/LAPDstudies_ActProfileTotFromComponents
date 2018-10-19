@@ -74,14 +74,19 @@ void setGraphStyle(TGraph* g, int color)
   g->SetMarkerSize(2);
 }
 
+void scaleHisto(TH1* h, int n)
+{
+  h->Scale(n/h->Integral());
+}
+
 void ActProfileTotFromComponents()
 {
   gStyle->SetPadGridX(1);
   gStyle->SetPadGridY(1);
 
   double timeEndAct = 1; // sec (time when activation phase ends)
-  double timeTot = 2; // sec
-  int n = 20000; // number of points
+  double timeTot = 20*60; // sec
+  int n = 2e5; // number of points
   
   Beam b;
   b.m_tp = 36e-9;
@@ -97,18 +102,21 @@ void ActProfileTotFromComponents()
   cout << "O15 tot number: " << O15.TotNumber(0, timeEndAct) << endl;
   
   TGraph* gN12VsTime = new TGraph(n);
-  setGraphStyle(gN12VsTime, kRed);
+  setGraphStyle(gN12VsTime, 7);
   TGraph* gC11VsTime = new TGraph(n);
-  setGraphStyle(gC11VsTime, kGreen+2);
+  setGraphStyle(gC11VsTime, kBlue);
   TGraph* gO15VsTime = new TGraph(n);
-  setGraphStyle(gO15VsTime, kBlue);
+  setGraphStyle(gO15VsTime, 3);
+  TGraph* gGammaVsTime = new TGraph(n);
+  setGraphStyle(gGammaVsTime, kMagenta);
   
   std::vector<double> N12numberAt;
   std::vector<double> C11numberAt;
   std::vector<double> O15numberAt;
+  std::vector<double> GammanumberAt;
   std::vector<double> times;
   
-  // init
+  // Init
   bool first = false;
   int i_firstOfDeactivation=0;
   for(double i=0; i<n; i++) {
@@ -122,53 +130,79 @@ void ActProfileTotFromComponents()
     N12numberAt.push_back(0);
     C11numberAt.push_back(0);
     O15numberAt.push_back(0);
+    GammanumberAt.push_back(0);
   }
   
-  // compute numbers for given times
+  // Compute numbers for all times
   for(double i=0; i<times.size(); i++) {
     double t = times[i];
 
-    if(i < i_firstOfDeactivation) { // activation
+    if(i < i_firstOfDeactivation) {
+      ////////////////////////////
+      // Activation phase
+      ////////////////////////////
+      
       N12numberAt[i] = N12.NumberOfDecaysAfterActivation(0, t);
       C11numberAt[i] = C11.NumberOfDecaysAfterActivation(0, t);
       O15numberAt[i] = O15.NumberOfDecaysAfterActivation(0, t);
+      GammanumberAt[i] = 0.00879*0.0284*b.getProtonsPerSecondAverage()*t;
 
       //cout << t << "  sec: N12=" << N12numberAt[i] << "  C11=" << C11numberAt[i] << "  O15=" << O15numberAt[i] << endl;
-    } else { //deactivation
+    } else {
+      ////////////////////////////
+      // Deactivation phase
+      ////////////////////////////
 
       N12numberAt[i] = N12numberAt[i_firstOfDeactivation-1] + N12.NumberOfDecaysAfterDeactivation(N12.TotNumber(0, timeEndAct) - N12numberAt[i_firstOfDeactivation-1], t-timeEndAct);
-
       C11numberAt[i] = C11numberAt[i_firstOfDeactivation-1] + C11.NumberOfDecaysAfterDeactivation(C11.TotNumber(0, timeEndAct) - C11numberAt[i_firstOfDeactivation-1], t-timeEndAct);
-
       O15numberAt[i] = O15numberAt[i_firstOfDeactivation-1] + O15.NumberOfDecaysAfterDeactivation(O15.TotNumber(0, timeEndAct) - O15numberAt[i_firstOfDeactivation-1], t-timeEndAct);
-
+      GammanumberAt[i] = GammanumberAt[i_firstOfDeactivation-1];
+      
       //cout << t << "  sec: N12=" << N12numberAt[i] << "  C11=" << C11numberAt[i] << "  O15=" << O15numberAt[i] << endl;
     }
-      gN12VsTime->SetPoint(i, t, N12numberAt[i]);
-      gC11VsTime->SetPoint(i, t, C11numberAt[i]);
-      gO15VsTime->SetPoint(i, t, O15numberAt[i]);
+    gN12VsTime->SetPoint(i, t, N12numberAt[i]);
+    gC11VsTime->SetPoint(i, t, C11numberAt[i]);
+    gO15VsTime->SetPoint(i, t, O15numberAt[i]);
+    gGammaVsTime->SetPoint(i, t, GammanumberAt[i]);
   }
 
+  TCanvas* c0 = new TCanvas("c0", "c0", 600, 600);
   TMultiGraph* multi = new TMultiGraph();
   multi->Add(gN12VsTime);
   multi->Add(gC11VsTime);
   multi->Add(gO15VsTime);
-
+  multi->Add(gGammaVsTime);
+  
   multi->Draw("ap");
-
-  multi->GetYaxis()->SetRangeUser(0.001, 3e7);
+  multi->GetYaxis()->SetRangeUser(0.001, 3e9);
   multi->Draw("ap");
+  gPad->SetLogy();
 
-    gPad->SetLogy();
+  // Activity profile
 
-  /*
-	std::vector<TH1F*> histVect;
+  TCanvas* c1 = new TCanvas("c1", "c1", 600, 600);
+  TFile* f = new TFile("data/Draw_Target_OnlyBeta_annihilation_option_Run_2_Setup_0.root");
+  TH1* h_N12 = (TH1*) f->Get("hProfil_EachZ_1000070120_stack_6");
+  TH1* h_C11 = (TH1*) f->Get("hProfil_EachZ_1000060110_stack_5");
+  TH1* h_O15 = (TH1*) f->Get("hProfil_EachZ_1000080150_stack_10");
+  TH1* h_Gamma = (TH1*) f->Get("hProfil_EachZ_22_stack_1");
 
-	THStack* hStack = new THStack();
-	
-	for (int i=0; i<histVect.size(); i++) {
-	
-	}	
-*/
+  double whichTime = 10*60;
+  int idx = whichTime/timeTot*(n-1);
+  cout << "times[idx]=" << times[idx] << endl;
+
+  // Rescaling of histograms
+  scaleHisto(h_N12, N12numberAt[idx]);
+  scaleHisto(h_C11, C11numberAt[idx]);
+  scaleHisto(h_O15, O15numberAt[idx]);
+  scaleHisto(h_Gamma, GammanumberAt[idx]);
+  
+  THStack* hStack = new THStack();
+  hStack->Add(h_Gamma);
+  hStack->Add(h_C11);
+  hStack->Add(h_N12);
+  hStack->Add(h_O15);
+  hStack->Draw("hist");
+  
 }
 
